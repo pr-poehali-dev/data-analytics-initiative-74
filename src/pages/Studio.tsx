@@ -9,7 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Icon from "@/components/ui/icon"
 import { toast } from "sonner"
 
+const API = {
+  lyrics: "https://functions.poehali.dev/5ebed163-0236-4168-8160-730f4a4d9650",
+  track: "https://functions.poehali.dev/e5511875-bba0-42b0-adf9-0e64d57d1ef7",
+  clip: "https://functions.poehali.dev/192bdf48-ac28-4638-942f-cc00f8e9f761",
+}
+
 type Mode = "track" | "lyrics" | "clip"
+type ClipScene = { time: string; description: string; visual: string }
 
 export default function Studio() {
   const navigate = useNavigate()
@@ -22,6 +29,10 @@ export default function Studio() {
   const [theme, setTheme] = useState("")
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [trackUrl, setTrackUrl] = useState<string | null>(null)
+  const [trackTaskId, setTrackTaskId] = useState<string | null>(null)
+  const [trackStatus, setTrackStatus] = useState<string>("")
+  const [clipScenes, setClipScenes] = useState<ClipScene[] | null>(null)
 
   useEffect(() => {
     const raw = localStorage.getItem("synapse_user")
@@ -32,7 +43,40 @@ export default function Studio() {
     setUser(JSON.parse(raw))
   }, [navigate])
 
-  const handleGenerate = () => {
+  const pollTrack = async (taskId: string) => {
+    const start = Date.now()
+    const TIMEOUT = 5 * 60 * 1000
+    while (Date.now() - start < TIMEOUT) {
+      try {
+        const r = await fetch(`${API.track}?task_id=${encodeURIComponent(taskId)}`)
+        const data = await r.json()
+        const items = data?.data?.response?.sunoData || data?.data?.data || []
+        const first = Array.isArray(items) ? items[0] : null
+        const url = first?.audioUrl || first?.audio_url || first?.streamAudioUrl
+        const status = data?.data?.status || data?.status
+        setTrackStatus(status || "обработка...")
+        if (url) {
+          setTrackUrl(url)
+          setGenerating(false)
+          setResult("ready")
+          toast.success("Трек готов! Можно слушать и скачивать")
+          return
+        }
+        if (status === "FAILED" || status === "ERROR") {
+          setGenerating(false)
+          toast.error("Ошибка генерации. Попробуй ещё раз")
+          return
+        }
+      } catch {
+        // продолжаем опрос
+      }
+      await new Promise((res) => setTimeout(res, 6000))
+    }
+    setGenerating(false)
+    toast.error("Время ожидания вышло. Проверь позже в кабинете")
+  }
+
+  const handleGenerate = async () => {
     if (mode === "track" && (!title || !lyrics)) {
       toast.error("Заполни название и текст трека")
       return
@@ -47,17 +91,54 @@ export default function Studio() {
     }
     setGenerating(true)
     setResult(null)
-    setTimeout(() => {
-      setGenerating(false)
+    setTrackUrl(null)
+    setClipScenes(null)
+    setTrackStatus("")
+
+    try {
       if (mode === "lyrics") {
-        setResult(
-          `[Куплет 1]\nГород спит, а я не сплю,\nТихо мысли свои ловлю.\nВетер в окна шепчет ритм —\nЭтот вечер будет хитом.\n\n[Припев]\nМы летим, мы горим,\nМы про${theme ? " " + theme : ""} говорим.\nЭта ночь — наша сцена,\nКаждый звук — это перемена.`
-        )
-      } else {
+        const r = await fetch(API.lyrics, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ theme, genre, mood }),
+        })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error || "Ошибка генерации")
+        setResult(data.lyrics)
+        toast.success("Текст готов!")
+        setGenerating(false)
+      } else if (mode === "clip") {
+        const r = await fetch(API.clip, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, mood, idea: theme }),
+        })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error || "Ошибка генерации")
+        setClipScenes(data.scenario?.scenes || [])
         setResult("ready")
+        toast.success("Сценарий клипа готов!")
+        setGenerating(false)
+      } else {
+        const r = await fetch(API.track, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, lyrics, genre, mood }),
+        })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error || "Ошибка запуска генерации")
+        const taskId = data?.data?.taskId || data?.taskId || data?.data?.task_id
+        if (!taskId) throw new Error("Не удалось получить task_id")
+        setTrackTaskId(taskId)
+        setTrackStatus("Генерируем трек, это занимает 1-3 минуты...")
+        toast.success("Запустили генерацию! Подожди 1-3 минуты")
+        pollTrack(taskId)
       }
-      toast.success("Готово! Файл сохранён в твой кабинет")
-    }, 2200)
+    } catch (e: unknown) {
+      setGenerating(false)
+      const msg = e instanceof Error ? e.message : "Что-то пошло не так"
+      toast.error(msg)
+    }
   }
 
   if (!user) return null
@@ -250,6 +331,18 @@ export default function Studio() {
           </Button>
         </Card>
 
+        {generating && mode === "track" && trackTaskId && (
+          <Card className="p-6 bg-zinc-900/60 border-red-500/30 mb-6">
+            <div className="flex items-center gap-3">
+              <Icon name="Loader" size={20} className="text-red-500 animate-spin" />
+              <div>
+                <div className="text-white font-medium">{trackStatus || "Обработка..."}</div>
+                <div className="text-gray-500 text-xs">Не закрывай страницу — мы покажем готовый трек</div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {result && (
           <Card className="p-6 bg-zinc-900/60 border-red-500/30">
             <div className="flex items-center gap-2 mb-4">
@@ -257,32 +350,63 @@ export default function Studio() {
               <h3 className="text-lg font-bold text-white font-orbitron">Готово!</h3>
             </div>
 
-            {mode === "lyrics" ? (
+            {mode === "lyrics" && (
               <pre className="whitespace-pre-wrap text-gray-200 bg-black/40 p-4 rounded-lg border border-red-500/10 mb-4 font-mono text-sm">
                 {result}
               </pre>
-            ) : (
-              <div className="bg-black/40 p-6 rounded-lg border border-red-500/10 mb-4 flex items-center gap-4">
-                <div className="w-16 h-16 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <Icon name={mode === "track" ? "Music" : "Video"} size={32} className="text-red-500" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-white font-medium">{title || "Без названия"}</div>
-                  <div className="text-gray-500 text-sm">
-                    {mode === "track" ? "Трек • 2:48 • WAV" : "Клип • HD MP4"}
+            )}
+
+            {mode === "track" && trackUrl && (
+              <div className="bg-black/40 p-6 rounded-lg border border-red-500/10 mb-4">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <Icon name="Music" size={32} className="text-red-500" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white font-medium">{title}</div>
+                    <div className="text-gray-500 text-sm">{genre} • {mood}</div>
                   </div>
                 </div>
+                <audio controls src={trackUrl} className="w-full" />
+              </div>
+            )}
+
+            {mode === "clip" && clipScenes && (
+              <div className="space-y-3 mb-4">
+                {clipScenes.map((scene, i) => (
+                  <div key={i} className="bg-black/40 p-4 rounded-lg border border-red-500/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-red-500 text-xs font-mono">{scene.time}</span>
+                      <span className="text-white font-medium text-sm">Сцена {i + 1}</span>
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2">{scene.description}</p>
+                    <p className="text-gray-500 text-xs italic">Визуал: {scene.visual}</p>
+                  </div>
+                ))}
               </div>
             )}
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={() => toast.success("Скачивание началось!")}
-                className="bg-red-500 hover:bg-red-600 text-white"
-              >
-                <Icon name="Download" size={18} className="mr-2" />
-                Скачать
-              </Button>
+              {mode === "track" && trackUrl && (
+                <Button asChild className="bg-red-500 hover:bg-red-600 text-white">
+                  <a href={trackUrl} download={`${title}.mp3`} target="_blank" rel="noreferrer">
+                    <Icon name="Download" size={18} className="mr-2" />
+                    Скачать MP3
+                  </a>
+                </Button>
+              )}
+              {mode === "lyrics" && (
+                <Button
+                  onClick={() => {
+                    navigator.clipboard.writeText(result)
+                    toast.success("Текст скопирован")
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                >
+                  <Icon name="Copy" size={18} className="mr-2" />
+                  Скопировать текст
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => navigate("/dashboard")}
@@ -293,7 +417,7 @@ export default function Studio() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => { setResult(null); setTitle(""); setLyrics(""); setTheme("") }}
+                onClick={() => { setResult(null); setTrackUrl(null); setClipScenes(null); setTitle(""); setLyrics(""); setTheme("") }}
                 className="text-gray-400 hover:text-white"
               >
                 Создать ещё
