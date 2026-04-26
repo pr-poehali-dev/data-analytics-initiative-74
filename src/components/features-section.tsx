@@ -1,53 +1,54 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import Icon from "@/components/ui/icon"
 
 const features = [
   {
-    title: "Адаптивная нейрообработка",
-    description: "Самооптимизирующиеся алгоритмы, которые обучаются на нейронных паттернах и улучшают интерпретацию сигналов.",
-    icon: "brain",
-    badge: "ИИ",
+    title: "Генерация музыки",
+    description: "Создавай треки в любом жанре за минуты — от лоу-фай до электронной танцевальной музыки и рока.",
+    icon: "Music",
+    badge: "AI Music",
   },
   {
-    title: "Медицинская защита",
-    description: "Шифрование по стандартам FDA со сквозной защитой конфиденциальных нейронных данных.",
-    icon: "lock",
-    badge: "Сертификат",
+    title: "Треки на твой текст",
+    description: "Загрузи свой текст или стихи — нейросеть превратит их в полноценный музыкальный трек с вокалом.",
+    icon: "Mic",
+    badge: "Vocal AI",
   },
   {
-    title: "Интуитивное управление",
-    description: "Естественная трансляция мыслей в действия с откликом менее миллисекунды и точностью 99,7%.",
-    icon: "globe",
-    badge: "Точность",
+    title: "Генерация текстов",
+    description: "Помощник напишет цепляющие тексты песен в нужном стиле, настроении и теме за пару секунд.",
+    icon: "PenLine",
+    badge: "Lyrics",
   },
   {
-    title: "Предиктивная калибровка",
-    description: "ML-модели, которые предугадывают намерения пользователя и оптимизируют нейронные пути.",
-    icon: "zap",
-    badge: "Умный",
+    title: "Создание клипов",
+    description: "Автоматический видеоряд под твой трек: визуалы, эффекты, синхронизация с битом.",
+    icon: "Video",
+    badge: "Video AI",
   },
   {
-    title: "Биометрическая интеграция",
-    description: "Бесшовная синхронизация с мониторингом жизненных показателей для контроля здоровья.",
-    icon: "link",
-    badge: "Связь",
+    title: "Облачное хранилище",
+    description: "Все твои треки, тексты и клипы хранятся в личном кабинете. Доступ с любого устройства.",
+    icon: "Cloud",
+    badge: "Cloud",
   },
   {
-    title: "Поддержка XR",
-    description: "Нативная совместимость с AR/VR-средами для терапевтических и рабочих приложений.",
-    icon: "target",
-    badge: "XR Ready",
+    title: "Скачивание в HD",
+    description: "Экспорт треков в WAV/MP3 и клипов в HD-качестве. Полные права на использование.",
+    icon: "Download",
+    badge: "HD Export",
   },
 ]
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 px-6 bg-background">
+    <section id="features" className="py-24 px-6 bg-background">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-foreground mb-4 font-sans">Возможности нового поколения</h2>
+          <h2 className="text-4xl font-bold text-foreground mb-4 font-sans">Всё для твоей музыки</h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Почувствуйте будущее с технологиями, которые переопределяют возможное
+            Полный набор AI-инструментов для создания треков, текстов и клипов
           </p>
         </div>
 
@@ -60,14 +61,9 @@ export function FeaturesSection() {
             >
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-3xl">
-                    {feature.icon === "brain" && "&#129504;"}
-                    {feature.icon === "lock" && "&#128274;"}
-                    {feature.icon === "globe" && "&#127760;"}
-                    {feature.icon === "zap" && "&#9889;"}
-                    {feature.icon === "link" && "&#128279;"}
-                    {feature.icon === "target" && "&#127919;"}
-                  </span>
+                  <div className="w-12 h-12 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                    <Icon name={feature.icon} size={24} className="text-red-500" />
+                  </div>
                   <Badge variant="secondary" className="bg-accent text-accent-foreground">
                     {feature.badge}
                   </Badge>
